@@ -9,14 +9,25 @@ const RED = '#ff6470';
 const GREEN = '#99C47A';
 const BLUE = '#68ABDF';
 
+const GRID_WIDTH = 10
+const GRID_CELL_RES = 100
+
+function CellToScreen(x: number, y: number): Vector2{
+  return new Vector2(x * GRID_CELL_RES + GRID_CELL_RES/2, -y * GRID_CELL_RES + GRID_CELL_RES/2)
+}
+
+function IndexToScreen(x: number): number{
+  return x * GRID_CELL_RES + GRID_CELL_RES/2
+}
+
 export default makeScene2D(function* (view) {
   const rects: Rect[] = [];
 
   view.add(
     <>
       <Grid
-        size={1000}
-        spacing={() => 100}
+        size={GRID_CELL_RES * GRID_WIDTH}
+        spacing={() => GRID_CELL_RES}
         stroke={'#999'}
         lineWidth={1}
         cache
@@ -24,8 +35,8 @@ export default makeScene2D(function* (view) {
 
       <Rect
         ref={makeRef(rects, 0)}
-        size={[300, 400]}
-        position={[-250, 0]}
+        size={[100, 100]}
+        position={CellToScreen(0, 0)}
         fill={BLUE}
         radius={10}
         stroke={RED}
@@ -34,8 +45,8 @@ export default makeScene2D(function* (view) {
 
       <Rect
         ref={makeRef(rects, 1)}
-        size={[400, 300]}
-        position={[200, 50]}
+        size={[100, 100]}
+        position={CellToScreen(4, 4)}
         fill={BLUE}
         radius={10}
         stroke={RED}
@@ -44,8 +55,8 @@ export default makeScene2D(function* (view) {
 
       <Rect
         ref={makeRef(rects, 2)}
-        size={[300, 400]}
-        position={[-50, 200]}
+        size={[100, 100]}
+        position={CellToScreen(-4, 4)}
         fill={BLUE}
         radius={10}
         stroke={RED}
@@ -56,10 +67,10 @@ export default makeScene2D(function* (view) {
     
   )
 
-  yield* rects[0].position.x(-350, 0.5)
-  yield* rects[1].position.y(250, 0.5)
-  yield* rects[2].position.x(50, 0.5)
-  yield* rects[2].position.y(-200, 0.5)
+  yield* rects[0].position.x(IndexToScreen(-4), 0.5)
+  yield* rects[1].position.y(IndexToScreen(0), 0.5)
+  yield* rects[2].position.x(IndexToScreen(2), 0.5)
+  yield* rects[2].position.y(IndexToScreen(2), 0.5)
 
   const lines: Line[] = [];
   const texts: Txt[] = [];
