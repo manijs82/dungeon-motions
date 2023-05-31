@@ -1,6 +1,6 @@
 import {makeScene2D} from '@motion-canvas/2d/lib/scenes';
-import {Rect, Grid, Line, Circle, Txt} from '@motion-canvas/2d/lib/components';
-import {createRef, makeRef, range} from '@motion-canvas/core/lib/utils';
+import {Rect, Grid, Line, Circle, Txt, Node, Layout} from '@motion-canvas/2d/lib/components';
+import {createRef, makeRef, range, useRandom} from '@motion-canvas/core/lib/utils';
 import {Vector2} from '@motion-canvas/core/lib/types';
 import {all, waitFor} from '@motion-canvas/core/lib/flow';
 import {DEFAULT, createSignal} from '@motion-canvas/core/lib/signals';
@@ -16,62 +16,80 @@ function CellToScreen(x: number, y: number): Vector2{
   return new Vector2(x * GRID_CELL_RES + GRID_CELL_RES/2, -y * GRID_CELL_RES + GRID_CELL_RES/2)
 }
 
+function CellToScreenCustom(x: number, y: number, cell_res: number): Vector2{
+  return new Vector2(x * cell_res + cell_res/2, -y * cell_res + cell_res/2)
+}
+
 function IndexToScreen(x: number): number{
   return x * GRID_CELL_RES + GRID_CELL_RES/2
 }
 
+function RandomCell(): Vector2{
+  const random = useRandom();
+  const x = random.nextInt(-4, 5);
+  const y = random.nextInt(-4, 5);
+
+  return CellToScreen(x, y);
+}
+
 export default makeScene2D(function* (view) {
   const rects: Rect[] = [];
+  const parent = createRef<Rect>();
+  const group = createRef<Rect>();
 
-  view.add(
-    <>
+  view.add(    
+    <Rect ref={parent} size={[1000, 1000]} />
+  )
+
+  view.add(    
+    <Rect ref={group} size={GRID_CELL_RES * GRID_WIDTH}>
       <Grid
-        size={GRID_CELL_RES * GRID_WIDTH}
+        width={'100%'} height={'100%'}
         spacing={() => GRID_CELL_RES}
         stroke={'#999'}
         lineWidth={1}
         cache
       />
-
       <Rect
         ref={makeRef(rects, 0)}
-        size={[100, 100]}
-        position={CellToScreen(0, 0)}
+        width={'10%'} height={'10%'}
+        position={RandomCell()}
         fill={BLUE}
         radius={10}
         stroke={RED}
         lineWidth={8}
       />
-
       <Rect
         ref={makeRef(rects, 1)}
-        size={[100, 100]}
-        position={CellToScreen(4, 4)}
+        width={'10%'} height={'10%'}
+        position={RandomCell()}
         fill={BLUE}
         radius={10}
         stroke={RED}
         lineWidth={8}
       />
-
       <Rect
         ref={makeRef(rects, 2)}
-        size={[100, 100]}
-        position={CellToScreen(-4, 4)}
+        width={'10%'} height={'10%'}
+        position={RandomCell()}
         fill={BLUE}
         radius={10}
         stroke={RED}
         lineWidth={8}
       />
-
-    </>
-    
+    </Rect>
   )
 
-  yield* rects[0].position.x(IndexToScreen(-4), 0.5)
-  yield* rects[1].position.y(IndexToScreen(0), 0.5)
-  yield* rects[2].position.x(IndexToScreen(2), 0.5)
-  yield* rects[2].position.y(IndexToScreen(2), 0.5)
+  yield* all(
+    group().position(CellToScreenCustom(-2, 2, 250), 0.8),
+    group().scale(0.25, 0.8)
+  )
 
+  yield* rects[0].position(RandomCell(), 0.5)
+  yield* rects[1].position(RandomCell(), 0.5)
+  yield* rects[2].position(RandomCell(), 0.5)
+
+  /*
   const lines: Line[] = [];
   const texts: Txt[] = [];
   const progress = createSignal(0);
@@ -150,7 +168,7 @@ export default makeScene2D(function* (view) {
     />  
   )
 
-  yield* progress(1, 1)
-  yield* waitFor(2)
+  yield* progress(1, 1) */
+  yield* waitFor(3) 
 });
 
