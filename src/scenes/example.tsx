@@ -1,9 +1,21 @@
 import {makeScene2D} from '@motion-canvas/2d/lib/scenes';
-import {Rect, Grid, Line, Circle, Txt, Node, Layout} from '@motion-canvas/2d/lib/components';
-import {createRef, makeRef, range, useRandom} from '@motion-canvas/core/lib/utils';
+import {Rect, Grid, Line, Circle, Txt, Node, Layout, View2D} from '@motion-canvas/2d/lib/components';
+import {Reference, createRef, makeRef, range, useRandom} from '@motion-canvas/core/lib/utils';
 import {Vector2} from '@motion-canvas/core/lib/types';
-import {all, waitFor} from '@motion-canvas/core/lib/flow';
+import {all, sequence, waitFor} from '@motion-canvas/core/lib/flow';
 import {DEFAULT, createSignal} from '@motion-canvas/core/lib/signals';
+
+class Dungeon{
+  rects: Rect[];
+  grid: Reference<Grid>;
+  group: Reference<Rect>;
+
+  public constructor(rects: Rect[], grid: Reference<Grid>, group: Reference<Rect>){
+    this.rects = rects;
+    this.grid = grid;
+    this.group = group;
+  }
+}
 
 const RED = '#ff6470';
 const GREEN = '#99C47A';
@@ -32,18 +44,15 @@ function RandomCell(): Vector2{
   return CellToScreen(x, y);
 }
 
-export default makeScene2D(function* (view) {
+function AddDungeonToView(view: View2D): Dungeon{
   const rects: Rect[] = [];
-  const parent = createRef<Rect>();
   const group = createRef<Rect>();
-
-  view.add(    
-    <Rect ref={parent} size={[1000, 1000]} />
-  )
+  const grid = createRef<Grid>();
 
   view.add(    
     <Rect ref={group} size={GRID_CELL_RES * GRID_WIDTH}>
       <Grid
+        ref={grid}
         width={'100%'} height={'100%'}
         spacing={() => GRID_CELL_RES}
         stroke={'#999'}
@@ -52,7 +61,7 @@ export default makeScene2D(function* (view) {
       />
       <Rect
         ref={makeRef(rects, 0)}
-        width={'10%'} height={'10%'}
+        width={'30%'} height={'30%'}
         position={RandomCell()}
         fill={BLUE}
         radius={10}
@@ -70,7 +79,7 @@ export default makeScene2D(function* (view) {
       />
       <Rect
         ref={makeRef(rects, 2)}
-        width={'10%'} height={'10%'}
+        width={'30%'} height={'30%'}
         position={RandomCell()}
         fill={BLUE}
         radius={10}
@@ -80,14 +89,57 @@ export default makeScene2D(function* (view) {
     </Rect>
   )
 
-  yield* all(
-    group().position(CellToScreenCustom(-2, 2, 250), 0.8),
-    group().scale(0.25, 0.8)
+  return new Dungeon(rects, grid, group);
+}
+
+export default makeScene2D(function* (view) {
+  const dungeons: Dungeon[] = [];
+
+  let index = 0;
+  for (let i = -1; i <= 0; i++) {
+    for (let j = 1; j >= 0; j--) {
+        let dungeon = AddDungeonToView(view);
+        dungeons.push(dungeon);
+        dungeon.group().position(CellToScreenCustom(i, j, 500))
+        dungeon.group().scale(0)
+
+        index++;
+    }
+  }
+
+  yield* sequence(0.2,
+    ...dungeons.map(dungeon => dungeon.group().scale(0.45, 0.8))
   )
 
-  yield* rects[0].position(RandomCell(), 0.5)
-  yield* rects[1].position(RandomCell(), 0.5)
-  yield* rects[2].position(RandomCell(), 0.5)
+  const validationLength = 1;
+  const newLineWidth = 6;
+
+  yield* waitFor(0.4)
+  yield* all(
+    dungeons[0].grid().stroke(GREEN, validationLength),
+    dungeons[0].grid().lineWidth(newLineWidth, validationLength),
+    dungeons[1].grid().stroke(RED, validationLength),
+    dungeons[1].grid().lineWidth(newLineWidth, validationLength),
+    dungeons[2].grid().stroke(GREEN, validationLength),
+    dungeons[2].grid().lineWidth(newLineWidth, validationLength),
+    dungeons[3].grid().stroke(RED, validationLength),
+    dungeons[3].grid().lineWidth(newLineWidth, validationLength),
+  )
+
+  yield* dungeons[1].group().remove();
+  yield* dungeons[3].group().remove();
+
+  view.add(dungeons[0].group().clone());
+
+  const moveTileDelay = 0.2;
+  const moveTileTime = 0.4;
+
+  for (let i = 0; i < dungeons.length; i++) {
+    const element = dungeons[i];
+    yield* sequence(moveTileDelay,
+      ...element.rects.map(rect => rect.position(RandomCell(), moveTileTime))
+    )
+  }
 
   /*
   const lines: Line[] = [];
