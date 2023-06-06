@@ -92,6 +92,20 @@ function AddDungeonToView(view: View2D): Dungeon{
   return new Dungeon(rects, grid, group);
 }
 
+function AddDungeonCloneToView(dungeon: Dungeon, view: View2D): Dungeon{
+  const rects: Rect[] = [];
+  const group = createRef<Rect>();
+  const grid = createRef<Grid>();
+
+  const clone = dungeon.group().clone({
+    ref(){group}
+  });
+
+  view.add(clone);
+
+  return new Dungeon(rects, grid, group);
+}
+
 export default makeScene2D(function* (view) {
   const dungeons: Dungeon[] = [];
 
@@ -129,7 +143,8 @@ export default makeScene2D(function* (view) {
   yield* dungeons[1].group().remove();
   yield* dungeons[3].group().remove();
 
-  view.add(dungeons[0].group().clone());
+  let d5 = AddDungeonCloneToView(dungeons[0], view);
+  yield* d5.group().position(CellToScreenCustom(-1, 0, 500), 0.4);
 
   const moveTileDelay = 0.2;
   const moveTileTime = 0.4;
