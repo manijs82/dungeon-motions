@@ -7,10 +7,10 @@ import {DEFAULT, createSignal} from '@motion-canvas/core/lib/signals';
 
 class Dungeon{
   rects: Rect[];
-  grid: Reference<Grid>;
-  group: Reference<Rect>;
+  grid: Grid;
+  group: Rect;
 
-  public constructor(rects: Rect[], grid: Reference<Grid>, group: Reference<Rect>){
+  public constructor(rects: Rect[], grid: Grid, group: Rect){
     this.rects = rects;
     this.grid = grid;
     this.group = group;
@@ -89,7 +89,7 @@ function AddDungeonToView(view: View2D): Dungeon{
     </Rect>
   )
 
-  return new Dungeon(rects, grid, group);
+  return new Dungeon(rects, grid(), group());
 }
 
 function AddDungeonCloneToView(dungeon: Dungeon, view: View2D): Dungeon{
@@ -97,13 +97,21 @@ function AddDungeonCloneToView(dungeon: Dungeon, view: View2D): Dungeon{
   const group = createRef<Rect>();
   const grid = createRef<Grid>();
 
-  const clone = dungeon.group().clone({
-    ref(){group}
+  const cloneGroup = dungeon.group.clone();
+  cloneGroup.removeChildren();
+  const cloneGrid = dungeon.grid.clone();
+  cloneGroup.add(cloneGrid);
+  let i = 0;
+  dungeon.rects.forEach(rect => {
+    const cloneRect = rect.clone();
+    rects[i] = cloneRect;
+    cloneGroup.add(rects[i]);
+    i++;
   });
 
-  view.add(clone);
+  view.add(cloneGroup);
 
-  return new Dungeon(rects, grid, group);
+  return new Dungeon(rects, cloneGrid, cloneGroup);
 }
 
 export default makeScene2D(function* (view) {
@@ -114,15 +122,15 @@ export default makeScene2D(function* (view) {
     for (let j = 1; j >= 0; j--) {
         let dungeon = AddDungeonToView(view);
         dungeons.push(dungeon);
-        dungeon.group().position(CellToScreenCustom(i, j, 500))
-        dungeon.group().scale(0)
+        dungeon.group.position(CellToScreenCustom(i, j, 500))
+        dungeon.group.scale(0)
 
         index++;
     }
   }
 
   yield* sequence(0.2,
-    ...dungeons.map(dungeon => dungeon.group().scale(0.45, 0.8))
+    ...dungeons.map(dungeon => dungeon.group.scale(0.45, 0.8))
   )
 
   const validationLength = 1;
@@ -130,33 +138,53 @@ export default makeScene2D(function* (view) {
 
   yield* waitFor(0.4)
   yield* all(
-    dungeons[0].grid().stroke(GREEN, validationLength),
-    dungeons[0].grid().lineWidth(newLineWidth, validationLength),
-    dungeons[1].grid().stroke(RED, validationLength),
-    dungeons[1].grid().lineWidth(newLineWidth, validationLength),
-    dungeons[2].grid().stroke(GREEN, validationLength),
-    dungeons[2].grid().lineWidth(newLineWidth, validationLength),
-    dungeons[3].grid().stroke(RED, validationLength),
-    dungeons[3].grid().lineWidth(newLineWidth, validationLength),
+    dungeons[0].grid.stroke(GREEN, validationLength),
+    dungeons[0].grid.lineWidth(newLineWidth, validationLength),
+    dungeons[1].grid.stroke(RED, validationLength),
+    dungeons[1].grid.lineWidth(newLineWidth, validationLength),
+    dungeons[2].grid.stroke(GREEN, validationLength),
+    dungeons[2].grid.lineWidth(newLineWidth, validationLength),
+    dungeons[3].grid.stroke(RED, validationLength),
+    dungeons[3].grid.lineWidth(newLineWidth, validationLength),
   )
 
-  yield* dungeons[1].group().remove();
-  yield* dungeons[3].group().remove();
+  yield* all(
+    dungeons[1].group.scale(0, 0.8),
+    dungeons[3].group.scale(0, 0.8)
+   )
+   yield* waitFor(0.4)
+
+  dungeons[1].group.remove();
+  dungeons[3].group.remove();
 
   let d5 = AddDungeonCloneToView(dungeons[0], view);
-  yield* d5.group().position(CellToScreenCustom(-1, 0, 500), 0.4);
+  let d6 = AddDungeonCloneToView(dungeons[2], view);
+  yield* all(d5.group.position(CellToScreenCustom(-1, 0, 500), 0.8),
+  d6.group.position(CellToScreenCustom(0, 0, 500), 0.8));
 
   const moveTileDelay = 0.2;
   const moveTileTime = 0.4;
 
-  for (let i = 0; i < dungeons.length; i++) {
-    const element = dungeons[i];
-    yield* sequence(moveTileDelay,
-      ...element.rects.map(rect => rect.position(RandomCell(), moveTileTime))
-    )
-  }
+  yield* waitFor(0.4)
+  yield* all(
+    dungeons[0].grid.stroke('#999', validationLength),
+    dungeons[0].grid.lineWidth(1, validationLength),
+    dungeons[2].grid.stroke('#999', validationLength),
+    dungeons[2].grid.lineWidth(1, validationLength),
+    d5.grid.stroke('#999', validationLength),
+    d5.grid.lineWidth(1, validationLength),
+    d6.grid.stroke('#999', validationLength),
+    d6.grid.lineWidth(1, validationLength)
+  )
 
-  /*
+  yield* sequence(moveTileDelay,
+    ...d5.rects.map(rect => rect.position(RandomCell(), moveTileTime))
+  )
+  yield* sequence(moveTileDelay,
+    ...d6.rects.map(rect => rect.position(RandomCell(), moveTileTime))
+  )
+
+  
   const lines: Line[] = [];
   const texts: Txt[] = [];
   const progress = createSignal(0);
@@ -175,11 +203,11 @@ export default makeScene2D(function* (view) {
     cache: true,
   };
 
-  view.add(
-    <>
+  d5.group.add(
+    <>  
       <Line
-      ref={makeRef(lines, 0)}
-        points={[rects[0].position, Vector2.zero]}
+        ref={makeRef(lines, 0)}
+        points={[d5.rects[0].position(), Vector2.zero]}
         lineWidth={8}
         endArrow
         stroke={GREEN}
@@ -187,8 +215,8 @@ export default makeScene2D(function* (view) {
       />
 
       <Line
-      ref={makeRef(lines, 1)}
-        points={[rects[1].position, Vector2.zero]}
+        ref={makeRef(lines, 1)}
+        points={[d5.rects[1].position(), Vector2.zero]}
         lineWidth={8}
         endArrow
         stroke={GREEN}
@@ -196,8 +224,8 @@ export default makeScene2D(function* (view) {
       />
 
       <Line
-      ref={makeRef(lines, 2)}
-        points={[rects[2].position, Vector2.zero]}
+        ref={makeRef(lines, 2)}
+        points={[d5.rects[2].position(), Vector2.zero]}
         lineWidth={8}
         endArrow
         stroke={GREEN}
@@ -206,7 +234,7 @@ export default makeScene2D(function* (view) {
     </>    
   )
 
-  view.add(
+  d5.group.add(
     range(3).map(i =>(
       <>
         <Txt
@@ -226,16 +254,16 @@ export default makeScene2D(function* (view) {
     return sum;
   });
 
-  view.add(
+  d5.group.add(
     <Txt
-      position={[400, -400]}
+      position={[400, -540]}
       text={() => `${fitness().toFixed(1)}`}
       fill={'DarkRed'}
       {...textStyle2}
     />  
   )
 
-  yield* progress(1, 1) */
+  yield* progress(1, 1)
   yield* waitFor(3) 
 });
 
