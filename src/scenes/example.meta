@@ -1,5 +1,26 @@
 {
   "version": 0,
-  "timeEvents": [],
+  "timeEvents": [
+    {
+      "name": "initSound",
+      "targetTime": 4.999582514564636
+    },
+    {
+      "name": "validateStart",
+      "targetTime": 21.22371131685085
+    },
+    {
+      "name": "mutateStart",
+      "targetTime": 28.27510194259639
+    },
+    {
+      "name": "evalStart",
+      "targetTime": 36.70968062789535
+    },
+    {
+      "name": "selectStart",
+      "targetTime": 51.51534864408968
+    }
+  ],
   "seed": 3204854289
 }

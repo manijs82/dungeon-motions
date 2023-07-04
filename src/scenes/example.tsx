@@ -2,8 +2,10 @@ import {makeScene2D} from '@motion-canvas/2d/lib/scenes';
 import {Rect, Grid, Line, Circle, Txt, Node, Layout, View2D} from '@motion-canvas/2d/lib/components';
 import {Reference, createRef, makeRef, range, useRandom} from '@motion-canvas/core/lib/utils';
 import {Vector2} from '@motion-canvas/core/lib/types';
-import {all, sequence, waitFor} from '@motion-canvas/core/lib/flow';
+import {all, sequence, waitFor, waitUntil} from '@motion-canvas/core/lib/flow';
 import {DEFAULT, createSignal} from '@motion-canvas/core/lib/signals';
+import {CodeBlock, lines, edit, insert, remove} from '@motion-canvas/2d/lib/components/CodeBlock';
+import { ThreadGenerator } from '@motion-canvas/core/lib/threading';
 
 class Dungeon{
   rects: Rect[];
@@ -92,6 +94,87 @@ function AddDungeonToView(view: View2D): Dungeon{
   return new Dungeon(rects, grid(), group());
 }
 
+function* EvaluateDungeon(dungeon: Dungeon): ThreadGenerator{
+  const lines: Line[] = [];
+  const texts: Txt[] = [];
+  const progress = createSignal(0);
+
+  const textStyle = {
+    fontWeight: 700,
+    fontSize: 56,
+    offsetY: -1,
+    padding: 20,
+    cache: true,
+  };
+
+  const textStyle2 = {
+    fontWeight: 700,
+    fontSize: 56,
+    cache: true,
+  };
+
+  dungeon.group.add(
+    <>  
+      <Line
+        ref={makeRef(lines, 0)}
+        points={[dungeon.rects[0].position(), Vector2.zero]}
+        lineWidth={8}
+        endArrow
+        stroke={GREEN}
+        end={progress}
+      />
+
+      <Line
+        ref={makeRef(lines, 1)}
+        points={[dungeon.rects[1].position(), Vector2.zero]}
+        lineWidth={8}
+        endArrow
+        stroke={GREEN}
+        end={progress}
+      />
+
+      <Line
+        ref={makeRef(lines, 2)}
+        points={[dungeon.rects[2].position(), Vector2.zero]}
+        lineWidth={8}
+        endArrow
+        stroke={GREEN}
+        end={progress}
+      />
+    </>    
+  )
+
+  dungeon.group.add(
+    range(3).map(i =>(
+      <>
+        <Txt
+          ref={makeRef(texts, i)}
+          position={() => lines[i].getPointAtPercentage(progress()/2).position}
+          text={() => `${lines[i].arcLength().toFixed() / 20.0}`}
+          fill={'DarkRed'}
+          {...textStyle}
+        />
+      </>
+    ))
+  )
+
+  const fitness = createSignal(() => {
+    let sum: number = 0;
+    lines.forEach(a => sum += a.arcLength() / 20.0);
+    return sum;
+  });
+
+  dungeon.group.add(
+    <Txt
+      position={[400, -510]}
+      text={() => `${fitness().toFixed(1)}`}
+      fill={'DarkRed'}
+      {...textStyle2}
+    />  
+  )
+  yield* progress(1, 1)
+}
+
 function AddDungeonCloneToView(dungeon: Dungeon, view: View2D): Dungeon{
   const rects: Rect[] = [];
   const group = createRef<Rect>();
@@ -117,6 +200,10 @@ function AddDungeonCloneToView(dungeon: Dungeon, view: View2D): Dungeon{
 export default makeScene2D(function* (view) {
   const dungeons: Dungeon[] = [];
 
+  // initialize first dungeons
+
+  yield* waitUntil('initSound');
+
   let index = 0;
   for (let i = -1; i <= 0; i++) {
     for (let j = 1; j >= 0; j--) {
@@ -131,12 +218,18 @@ export default makeScene2D(function* (view) {
 
   yield* sequence(0.2,
     ...dungeons.map(dungeon => dungeon.group.scale(0.45, 0.8))
-  )
+  );
+
+  //-----------------------------------------------------
+
+  // discard invalid dungeons
+
+  yield* waitUntil('validateStart');
 
   const validationLength = 1;
   const newLineWidth = 6;
 
-  yield* waitFor(0.4)
+  yield* waitFor(0.4);
   yield* all(
     dungeons[0].grid.stroke(GREEN, validationLength),
     dungeons[0].grid.lineWidth(newLineWidth, validationLength),
@@ -146,26 +239,35 @@ export default makeScene2D(function* (view) {
     dungeons[2].grid.lineWidth(newLineWidth, validationLength),
     dungeons[3].grid.stroke(RED, validationLength),
     dungeons[3].grid.lineWidth(newLineWidth, validationLength),
-  )
+  );
 
   yield* all(
     dungeons[1].group.scale(0, 0.8),
     dungeons[3].group.scale(0, 0.8)
-   )
-   yield* waitFor(0.4)
+  );
+
+  yield* waitFor(0.4)
 
   dungeons[1].group.remove();
   dungeons[3].group.remove();
 
+  //-----------------------------------------------------
+
+  // clone valid dungeons
+
   let d5 = AddDungeonCloneToView(dungeons[0], view);
   let d6 = AddDungeonCloneToView(dungeons[2], view);
-  yield* all(d5.group.position(CellToScreenCustom(-1, 0, 500), 0.8),
-  d6.group.position(CellToScreenCustom(0, 0, 500), 0.8));
+
+  yield* all(
+    d5.group.position(CellToScreenCustom(-1, 0, 500), 0.8),
+    d6.group.position(CellToScreenCustom(0, 0, 500), 0.8)
+  );
 
   const moveTileDelay = 0.2;
   const moveTileTime = 0.4;
 
-  yield* waitFor(0.4)
+  yield* waitFor(0.4);
+
   yield* all(
     dungeons[0].grid.stroke('#999', validationLength),
     dungeons[0].grid.lineWidth(1, validationLength),
@@ -175,95 +277,51 @@ export default makeScene2D(function* (view) {
     d5.grid.lineWidth(1, validationLength),
     d6.grid.stroke('#999', validationLength),
     d6.grid.lineWidth(1, validationLength)
-  )
+  );
+
+  //-----------------------------------------------------
+
+  // mutate the copied dungeons
+
+  yield* waitUntil('mutateStart');
 
   yield* sequence(moveTileDelay,
     ...d5.rects.map(rect => rect.position(RandomCell(), moveTileTime))
-  )
+  );
   yield* sequence(moveTileDelay,
     ...d6.rects.map(rect => rect.position(RandomCell(), moveTileTime))
-  )
+  );
 
+  //-----------------------------------------------------
+
+  // evaluate all dungeons
+
+  yield* waitUntil('evalStart');
   
-  const lines: Line[] = [];
-  const texts: Txt[] = [];
-  const progress = createSignal(0);
+  yield* all(
+    EvaluateDungeon(dungeons[0]),
+    EvaluateDungeon(dungeons[2]),
+    EvaluateDungeon(d5),
+    EvaluateDungeon(d6)
+  );
 
-  const textStyle = {
-    fontWeight: 700,
-    fontSize: 56,
-    offsetY: -1,
-    padding: 20,
-    cache: true,
-  };
+  yield* waitUntil('selectStart');
 
-  const textStyle2 = {
-    fontWeight: 700,
-    fontSize: 56,
-    cache: true,
-  };
+  yield* all(
+    d6.grid.stroke('gold', validationLength),
+    d6.grid.lineWidth(newLineWidth, validationLength)
+  );
 
-  d5.group.add(
-    <>  
-      <Line
-        ref={makeRef(lines, 0)}
-        points={[d5.rects[0].position(), Vector2.zero]}
-        lineWidth={8}
-        endArrow
-        stroke={GREEN}
-        end={progress}
-      />
+  yield* waitFor(1);
 
-      <Line
-        ref={makeRef(lines, 1)}
-        points={[d5.rects[1].position(), Vector2.zero]}
-        lineWidth={8}
-        endArrow
-        stroke={GREEN}
-        end={progress}
-      />
+  yield* all(
+    dungeons[0].group.scale(0, 0.8),
+    dungeons[2].group.scale(0, 0.8),
+    d5.group.scale(0, 0.8),
+    d6.group.scale(0, 0.8)
+   );
 
-      <Line
-        ref={makeRef(lines, 2)}
-        points={[d5.rects[2].position(), Vector2.zero]}
-        lineWidth={8}
-        endArrow
-        stroke={GREEN}
-        end={progress}
-      />
-    </>    
-  )
+  yield* waitFor(2);
 
-  d5.group.add(
-    range(3).map(i =>(
-      <>
-        <Txt
-          ref={makeRef(texts, i)}
-          position={() => lines[i].getPointAtPercentage(progress()/2).position}
-          text={() => `${lines[i].arcLength().toFixed() / 20.0}`}
-          fill={'DarkRed'}
-          {...textStyle}
-        />
-      </>
-    ))
-  )
-
-  const fitness = createSignal(() => {
-    let sum: number = 0;
-    lines.forEach(a => sum += a.arcLength() / 20.0);
-    return sum;
-  });
-
-  d5.group.add(
-    <Txt
-      position={[400, -540]}
-      text={() => `${fitness().toFixed(1)}`}
-      fill={'DarkRed'}
-      {...textStyle2}
-    />  
-  )
-
-  yield* progress(1, 1)
-  yield* waitFor(3) 
 });
 
